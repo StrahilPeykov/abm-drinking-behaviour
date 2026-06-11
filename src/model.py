@@ -1,24 +1,26 @@
 """Baseline replication of the drinking-behaviour ABM of Gorman et al. (2006).
 
 Gorman, D. M., Mezic, J., Mezic, I., & Gruenewald, P. J. (2006). Agent-based
-modeling of drinking behavior: a preliminary model and potential applications
-to theory and practice. American Journal of Public Health, 96(11), 2055-2060.
+modeling of drinking behavior: a preliminary model and potential applications to
+theory and practice. American Journal of Public Health, 96(11), 2055-2060.
 
 Agents on a one-dimensional lattice are susceptible nondrinkers (S), current
-drinkers (D), or former drinkers (R). Each iteration they convert between
-states based on the composition of their own site (``_transition``) and then
-perform a random walk (``_move``). A bar site, when present, biases the
-movement of current drinkers toward it.
+drinkers (D), or former drinkers (R). Each iteration they convert between states
+based on the composition of their own site (``_transition``) and then perform a
+random walk (``_move``). A bar site, when present, biases the movement of
+current drinkers toward it.
 
-Assumptions where the paper is silent (to be reviewed by the group):
+Assumptions where the paper is silent (still to be reviewed by the group):
 
-* Transitions are synchronous: all agents convert based on the site counts
-  at the start of the iteration, then everyone moves.
+* Transitions are synchronous: all agents convert based on the site counts at
+  the start of the iteration, then everyone moves.
 * Lattice boundaries are closed: a step that would leave the lattice is not
   taken.
 * Transition probabilities are capped at 1 (e.g. d/t + rho can exceed 1).
-* A current drinker already at the bar treats "toward the bar" as staying,
-  and "away from the bar" as a step in a uniformly random direction.
+* The bar attracts current drinkers from anywhere on the lattice; the paper says
+  "in proximity to a bar" without specifying a radius or scope.
+* A current drinker already at the bar treats "toward the bar" as staying, and
+  "away from the bar" as a step in a uniformly random direction.
 """
 
 from dataclasses import dataclass, field
@@ -44,8 +46,11 @@ class GormanModel:
 
     positions: np.ndarray = field(init=False, repr=False)
     states: np.ndarray = field(init=False, repr=False)
+    rng: np.random.Generator = field(init=False, repr=False)
 
     def __post_init__(self):
+        if self.n_sites <= 0:
+            raise ValueError("n_sites must be positive")
         if not 0.0 <= self.p_move <= 0.5:
             raise ValueError("p_move must be in [0, 0.5]")
         if not 0.0 <= self.gamma <= 1.0:

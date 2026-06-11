@@ -3,37 +3,36 @@
 ## Abstract
 
 Drinking behaviour emerges from a combination of individual decision making,
-peer influence and the availability of drinking environments. We will
-replicate and extend the agent-based model by Gorman et al. (2006), in which
-agents move on a one-dimensional lattice, interact locally, and adjust their
-drinking status. In the second iteration of the model in the paper, a bar is
-also introduced to attract drinkers and alter diffusion. In the original
-paper, agents can take three statuses: susceptible nondrinkers (S), current
-drinkers (D), and former drinkers (D), and change their drinking status with
-a given probability. In our research, we aim to replicate the key results
-from the original paper, and extend the model both with new architecture and
-additional features and attributes of the agents. Our research questions are:
-how do bounded rationality, risk/loss aversion, and alcohol-outlet attraction
-affect the emergence, clustering, and persistence of drinking behaviour?
-After reproducing the baseline experiments on movement, relapse/resistance
-and bar attraction, we extend the model in different ways: firstly, we will
-study how the same interactions can be modeled using a two-dimensional
-lattice and/or a network model. Secondly, we aim to study how adding
-attributes such as age-determined susceptibility, risk aversion, and stronger
-pressure through social media influencers will impact the propagation of the
-drinking behavior through the network. Lastly, we will calibrate agents with
-a probability of leaving their immediate social circle when the majority of
-it does not agree with the agent's drinking behaviors, reflecting rewiring
-probability. We will measure drinking prevalence, relapse, susceptible
-survival, spatial clustering, and sensitivity of outcomes to behavioral and
-environmental parameters. Lastly, we will perform sensitivity analysis where
-we will study how varying values of multiple model parameters, such as number
-of agent's neighbors or the threshold for rewiring will affect the results
-and drinking contagion. This way, we will identify which behavioral and
-environmental parameters most strongly determine these emergent outcomes.
-With this research, we aim to provide more understanding into how drinking
-behaviors emerge and spread among individuals, and how different factors and
-characteristics play a role in the process.
+peer influence and the availability of drinking environments. We will replicate
+and extend the agent-based model by Gorman et al. (2006), in which agents move
+on a one-dimensional lattice, interact locally, and adjust their drinking
+status. In the second iteration of the model in the paper, a bar is also
+introduced to attract drinkers and alter diffusion. In the original paper,
+agents can take three statuses: susceptible nondrinkers (S), current drinkers
+(D), and former drinkers (D), and change their drinking status with a given
+probability. In our research, we aim to replicate the key results from the
+original paper, and extend the model both with new architecture and additional
+features and attributes of the agents. Our research questions are: how do
+bounded rationality, risk/loss aversion, and alcohol-outlet attraction affect
+the emergence, clustering, and persistence of drinking behaviour? After
+reproducing the baseline experiments on movement, relapse/resistance and bar
+attraction, we extend the model in different ways: firstly, we will study how
+the same interactions can be modeled using a two-dimensional lattice and/or a
+network model. Secondly, we aim to study how adding attributes such as
+age-determined susceptibility, risk aversion, and stronger pressure through
+social media influencers will impact the propagation of the drinking behavior
+through the network. Lastly, we will calibrate agents with a probability of
+leaving their immediate social circle when the majority of it does not agree
+with the agent's drinking behaviors, reflecting rewiring probability. We will
+measure drinking prevalence, relapse, susceptible survival, spatial clustering,
+and sensitivity of outcomes to behavioral and environmental parameters. Lastly,
+we will perform sensitivity analysis where we will study how varying values of
+multiple model parameters, such as number of agent's neighbors or the threshold
+for rewiring will affect the results and drinking contagion. This way, we will
+identify which behavioral and environmental parameters most strongly determine
+these emergent outcomes. With this research, we aim to provide more
+understanding into how drinking behaviors emerge and spread among individuals,
+and how different factors and characteristics play a role in the process.
 
 ## Why Agent-Based Modelling?
 

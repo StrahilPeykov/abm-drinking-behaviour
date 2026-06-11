@@ -1,12 +1,16 @@
 """Run the baseline Gorman et al. (2006) model and plot S/D/R fractions.
 
-Defaults reproduce Figure 2 of the paper (p = 0.1, gamma = rho = 0.3,
-100 sites, 1000 iterations): the susceptible fraction drops to 0 around
-iteration 600 and current/former drinkers settle around 0.5 each.
+Defaults reproduce Figure 2 of the paper (p = 0.1, gamma = rho = 0.3, 100 sites,
+1000 iterations): the susceptible fraction drops to 0 around iteration 600 and
+current/former drinkers settle around 0.5 each.
 
 Usage:
-    python experiments/run_baseline.py
-    python experiments/run_baseline.py --p-move 0.3 --bar-site 0
+    python experiments/run_baseline.py python experiments/run_baseline.py
+    --p-move 0.3 --bar-site 7
+
+Site 7 matches the visual location of the clustering peak in the paper's Figure
+4 (see the replication notes in the README); pass --bar-site 0 for the literal
+left-edge reading.
 """
 
 import argparse
