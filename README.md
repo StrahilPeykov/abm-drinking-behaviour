@@ -42,14 +42,32 @@ source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
+## Running the baseline model
+
+Reproduces the dynamics of Figure 2 in Gorman et al. (2006), susceptibles
+decline to zero around iteration 500–600, current and former drinkers
+equilibrate around 0.5 each:
+
+```bash
+python experiments/run_baseline.py
+```
+
+With the bar at the left edge of the lattice (Figures 4–5 of the paper):
+
+```bash
+python experiments/run_baseline.py --p-move 0.3 --bar-site 0
+```
+
+Output (a figure and a CSV time series) is written to `results/`.
+
 ## Repository structure
 
 ```
-docs/    project proposal and notes
+docs/         project proposal and notes
+src/          model code
+experiments/  reproducible experiment scripts
+results/      generated figures and data (raw/processed runs are gitignored)
 ```
-
-Model code, experiment scripts, and results directories will be added as the
-implementation starts.
 
 ## Attribution
 

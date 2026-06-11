@@ -13,5 +13,6 @@ venv/
 .vscode/
 .idea/
 
-# Simulation output (keep final figures in git, not raw runs)
+# Simulation output (keep final figures in git, not run data)
 results/raw/
+results/processed/
