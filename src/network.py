@@ -8,17 +8,19 @@ social structure.
 Transition rules mirror the lattice model, replacing site co-occupants with
 graph neighbours::
 
-    P(S -> D) = d_neighbours / degree  if d_neighbours / degree >= 0.5, else 0
-    P(D -> R) = r_neighbours / degree + gamma
-    P(R -> D) = d_neighbours / degree + rho
+    P(S -> D) = d_frac  if d_frac >= agent.risk_aversion_start, else 0
+    P(D -> R) = r_frac + gamma
+    P(R -> D) = d_frac + rho  if d_frac >= agent.risk_aversion_relapse, else 0
 
-Isolated nodes (degree 0) use only the baseline rates gamma / rho.
+where d_frac and r_frac are the fractions of current drinkers and former
+drinkers among the agent's neighbours. Each agent's risk_aversion thresholds
+are drawn independently from Uniform(0, 1) at initialisation.
+
+Isolated nodes (degree 0) face zero social influence; D agents still quit
+at rate gamma and R agents are shielded from relapse (threshold never met).
 Transitions are synchronous: all agents convert based on neighbourhood
 composition at the start of the iteration.
 """
-
-from __future__ import annotations
-
 from dataclasses import dataclass, field
 
 import networkx as nx
@@ -29,23 +31,24 @@ S, D, R = 0, 1, 2
 
 @dataclass
 class Agent:
-    """A single agent node with a drinking state."""
+    """A single agent node on the social network.
 
+    Attributes
+    ----------
+    node_id:               index of the corresponding node in the graph
+    risk_aversion_start:   personal threshold for d_frac required before a
+                           susceptible agent can start drinking; drawn from
+                           Uniform(0, 1)
+    risk_aversion_relapse: personal threshold for d_frac required before a
+                           former drinker can relapse; drawn from
+                           Uniform(0, 1)
+    state:                 current drinking state - S (susceptible),
+                           D (current drinker), or R (former drinker)
+    """
     node_id: int
+    risk_aversion_start: float = 0.0
+    risk_aversion_relapse: float = 0.0
     state: int = S
-
-    @property
-    def is_susceptible(self) -> bool:
-        return self.state == S
-
-    @property
-    def is_drinker(self) -> bool:
-        return self.state == D
-
-    @property
-    def is_former_drinker(self) -> bool:
-        return self.state == R
-
 
 @dataclass
 class NetworkModel:
@@ -58,9 +61,11 @@ class NetworkModel:
                before rewiring (must be even)
     p_rewire:  Watts-Strogatz rewiring probability; 0 = regular ring,
                1 = random graph, ~0.1 gives the small-world regime
-    gamma:     baseline quit probability (no former drinkers in neighbourhood)
-    rho:       baseline relapse probability (no drinkers in neighbourhood)
-    seed:      random seed for reproducibility
+    gamma:                baseline quit probability (no former drinkers in neighbourhood)
+    rho:                  baseline relapse probability (no drinkers in neighbourhood)
+    initial_drinker_frac: fraction of agents initialised as current drinkers,
+                          chosen randomly across the network
+    seed:                 random seed for reproducibility
     """
 
     n_agents: int = 100
@@ -68,13 +73,12 @@ class NetworkModel:
     p_rewire: float = 0.1
     gamma: float = 0.3
     rho: float = 0.3
+    initial_drinker_frac: float = 0.1
     seed: int | None = None
 
     graph: nx.Graph = field(init=False, repr=False)
     agents: list[Agent] = field(init=False, repr=False)
     rng: np.random.Generator = field(init=False, repr=False)
-    _adj: np.ndarray = field(init=False, repr=False)
-    _degree: np.ndarray = field(init=False, repr=False)
 
     def __post_init__(self):
         if self.n_agents <= 0:
@@ -87,6 +91,8 @@ class NetworkModel:
             raise ValueError("gamma must be in [0, 1]")
         if not 0.0 <= self.rho <= 1.0:
             raise ValueError("rho must be in [0, 1]")
+        if not 0.0 <= self.initial_drinker_frac <= 1.0:
+            raise ValueError("initial_drinker_frac must be in [0, 1]")
 
         self.rng = np.random.default_rng(self.seed)
         nx_seed = int(self.rng.integers(0, 2**31))
@@ -94,13 +100,17 @@ class NetworkModel:
             self.n_agents, self.k, self.p_rewire, seed=nx_seed
         )
 
-        self._adj = nx.to_numpy_array(self.graph)
-        self._degree = self._adj.sum(axis=1)
-
         self.agents = [Agent(node_id=i, state=S) for i in range(self.n_agents)]
-        n_initial_drinkers = max(1, round(0.2 * self.n_agents))
+        n_initial_drinkers = max(1, round(self.initial_drinker_frac * self.n_agents))
         for i in self.rng.choice(self.n_agents, size=n_initial_drinkers, replace=False):
             self.agents[i].state = D
+
+        start_draws = self.rng.uniform(0.0, 1.0, size=self.n_agents)
+        relapse_draws = self.rng.uniform(0.0, 1.0, size=self.n_agents)
+
+        for i, agent in enumerate(self.agents):
+            agent.risk_aversion_start = start_draws[i]
+            agent.risk_aversion_relapse = relapse_draws[i]
 
     def _states(self) -> np.ndarray:
         return np.array([a.state for a in self.agents], dtype=np.int64)
@@ -111,22 +121,42 @@ class NetworkModel:
 
     def _transition(self):
         """Convert agents synchronously based on neighbourhood composition."""
-        states = self._states()
-        d_vec = (states == D).astype(float)
-        r_vec = (states == R).astype(float)
+        new_states = [None] * self.n_agents
 
-        d_frac = np.where(self._degree > 0, self._adj @ d_vec / self._degree, 0.0)
-        r_frac = np.where(self._degree > 0, self._adj @ r_vec / self._degree, 0.0)
+        for agent in self.agents:
+            neighbors = list(self.graph.neighbors(agent.node_id))
+            neighbor_total = len(neighbors)
 
-        u = self.rng.random(self.n_agents)
-        s_mask = states == S
-        d_mask = states == D
-        r_mask = states == R
+            if neighbor_total == 0:
+                d_frac = 0.0
+                r_frac = 0.0
+            else:
+                neighbor_states = [self.agents[i].state for i in neighbors]
+                d_frac = neighbor_states.count(D) / neighbor_total
+                r_frac = neighbor_states.count(R) / neighbor_total
 
-        new_states = states.copy()
-        new_states[s_mask & (d_frac >= 0.5) & (u < d_frac)] = D
-        new_states[d_mask & (u < np.minimum(r_frac + self.gamma, 1.0))] = R
-        new_states[r_mask & (u < np.minimum(d_frac + self.rho, 1.0))] = D
+            draw = self.rng.random()
+
+            if agent.state == S:
+                if d_frac >= agent.risk_aversion_start and draw < d_frac:
+                    new_states[agent.node_id] = D
+                else: 
+                    new_states[agent.node_id] = S
+            elif agent.state == D: 
+                probability = min(r_frac + self.gamma, 1.0)
+                if draw < probability:
+                    new_states[agent.node_id] = R
+                else: 
+                    new_states[agent.node_id] = D
+            elif agent.state == R:
+                if d_frac >= agent.risk_aversion_relapse:
+                    probability = min(d_frac + self.rho, 1.0)
+                    if draw < probability:
+                        new_states[agent.node_id] = D
+                    else:
+                        new_states[agent.node_id] = R
+                else:
+                    new_states[agent.node_id] = R
 
         for agent in self.agents:
             agent.state = new_states[agent.node_id]
