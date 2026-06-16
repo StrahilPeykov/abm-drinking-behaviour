@@ -10,7 +10,7 @@ graph neighbours::
 
     P(S -> D) = d_frac  if d_frac >= agent.risk_aversion_start, else 0
     P(D -> R) = r_frac + gamma
-    P(R -> D) = d_frac + rho  if d_frac >= agent.risk_aversion_relapse, else 0
+    P(R -> D) = d_frac + rho  if d_frac >= agent.risk_aversion_relapse, else rho
 
 where d_frac and r_frac are the fractions of current drinkers and former
 drinkers among the agent's neighbours. Each agent's risk_aversion thresholds
@@ -151,10 +151,10 @@ class NetworkModel:
             elif agent.state == R:
                 if d_frac >= agent.risk_aversion_relapse:
                     probability = min(d_frac + self.rho, 1.0)
-                    if draw < probability:
-                        new_states[agent.node_id] = D
-                    else:
-                        new_states[agent.node_id] = R
+                else:
+                    probability = self.rho
+                if draw < probability:
+                    new_states[agent.node_id] = D
                 else:
                     new_states[agent.node_id] = R
 
