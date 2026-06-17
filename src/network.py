@@ -8,7 +8,7 @@ social structure.
 Transition rules mirror the lattice model, replacing site co-occupants with
 graph neighbours::
 
-    P(S -> D) = d_frac  if d_frac >= agent.risk_aversion_start, else 0
+    P(S -> D) = d_frac  if d_frac >= agent.risk_aversion_start, else 0 -> start drinking if social pressure higher than own psychological barrier
     P(D -> R) = r_frac + gamma
     P(R -> D) = d_frac + rho  if d_frac >= agent.risk_aversion_relapse, else rho
 
@@ -46,9 +46,40 @@ class Agent:
                            D (current drinker), or R (former drinker)
     """
     node_id: int
-    risk_aversion_start: float = 0.0
-    risk_aversion_relapse: float = 0.0
+    #risk_aversion_start: float = 0.0
+    #risk_aversion_relapse: float = 0.0
+    lam_start: float = 2.0
+    lam_relapse: float = 2.0
     state: int = S
+
+def _logit_probability(delta_u: float, tau: float) -> float:
+    """Convert a utility difference into a choice probability via the
+    logit / quantal-response rule (McKelvey & Palfrey, 1995).
+ 
+    P(drink) = 1 / (1 + exp(-delta_u / tau))
+ 
+    tau controls bounded rationality:
+      - tau -> 0: approaches a deterministic best response (drink if delta_u > 0)
+      - tau -> infinity: approaches a coin flip (0.5), no matter how favourable delta_u is"""
+    tau = max(tau, 1e-9) #avoid division by zero
+    z = np.clip(-delta_u / tau, -60.0, 60.0)
+    return 1.0 / (1.0 + np.exp(z))
+
+
+def _loss_averse_utility(d_frac: float, lam: float) -> float:
+    """Utility difference U(drink) - U(abstain) under a loss-averse value
+    function (Kahneman & Tversky, 1979).
+ 
+    d_frac -> gain term: reward for matching a drinking-heavy neighbourhood (social reinforcement)
+    (1 - d_frac) -> loss term: downside of drinking when the neighbourhood does NOT support it,
+                                   weighted lambda times more heavily than the equivalent gain
+                                   
+    Simplified from the traditional prospect theory function: 
+    the full prospect-theory value is V = Σ w(p_i) · v(x_i) - value function v(x) and probability weighting function w(p). 
+    As it would expand our scope even more. """
+
+    delta_u = d_frac - lam * (1.0 - d_frac)
+    return delta_u
 
 @dataclass
 class NetworkModel:
@@ -63,6 +94,13 @@ class NetworkModel:
                1 = random graph, ~0.1 gives the small-world regime
     gamma:                baseline quit probability (no former drinkers in neighbourhood)
     rho:                  baseline relapse probability (no drinkers in neighbourhood)
+    tau:                  rationality temperature for the logit choice rule
+                          (bounded rationality, shared across the population).
+                          lower tau = more rational/deterministic; higher tau = noisier/more random decisions. 
+    lam_mean, lam_sd:     mean and standard deviation of the per-agent loss-aversion coefficients, 
+                          drawn from a Normal and clipped at a small positive floor so lam never goes non-positive. 
+                          lam_mean defaults to 2.0 (commonly-cited empirical ratio (losses feel ~2x as strong
+                          as equivalent gains).
     initial_drinker_frac: fraction of agents initialised as current drinkers,
                           chosen randomly across the network
     seed:                 random seed for reproducibility
@@ -73,6 +111,9 @@ class NetworkModel:
     p_rewire: float = 0.1
     gamma: float = 0.3
     rho: float = 0.3
+    tau: float = 0.5
+    lam_mean: float = 2.0
+    lam_sd: float = 0.5
     initial_drinker_frac: float = 0.1
     seed: int | None = None
 
@@ -89,8 +130,12 @@ class NetworkModel:
             raise ValueError("p_rewire must be in [0, 1]")
         if not 0.0 <= self.gamma <= 1.0:
             raise ValueError("gamma must be in [0, 1]")
+        
+        #new from Game Theory:
         if not 0.0 <= self.rho <= 1.0:
             raise ValueError("rho must be in [0, 1]")
+        if self.tau <= 0.0:
+            raise ValueError("tau must be positive (use a small value, not 0, for near-deterministic behaviour)")
         if not 0.0 <= self.initial_drinker_frac <= 1.0:
             raise ValueError("initial_drinker_frac must be in [0, 1]")
 
@@ -105,12 +150,18 @@ class NetworkModel:
         for i in self.rng.choice(self.n_agents, size=n_initial_drinkers, replace=False):
             self.agents[i].state = D
 
-        start_draws = self.rng.uniform(0.0, 1.0, size=self.n_agents)
-        relapse_draws = self.rng.uniform(0.0, 1.0, size=self.n_agents)
+        # draw per-agent loss-aversion coefficients from a Normal but cclipped at a small positive floor,
+        # instead of the old Uniform(0, 1) thresholds 
+        # this preserves population heterogeneity in risk attitude and givs lambda interpetaiton as in prospect theory
+        lam_start_draws = self.rng.normal(self.lam_mean, self.lam_sd, size=self.n_agents)
+        lam_relapse_draws = self.rng.normal(self.lam_mean, self.lam_sd, size=self.n_agents)
+        lam_floor = 1e-3
+        lam_start_draws = np.clip(lam_start_draws, lam_floor, None)
+        lam_relapse_draws = np.clip(lam_relapse_draws, lam_floor, None)
 
         for i, agent in enumerate(self.agents):
-            agent.risk_aversion_start = start_draws[i]
-            agent.risk_aversion_relapse = relapse_draws[i]
+            agent.lam_start = float(lam_start_draws[i])
+            agent.lam_relapse = float(lam_relapse_draws[i])
 
     def _states(self) -> np.ndarray:
         return np.array([a.state for a in self.agents], dtype=np.int64)
@@ -120,7 +171,10 @@ class NetworkModel:
         return np.bincount(self._states(), minlength=3) / self.n_agents
 
     def _transition(self):
-        """Convert agents synchronously based on neighbourhood composition."""
+        """Convert agents synchronously based on neighbourhood composition.
+        S -> D and R -> D now go through the loss-averse-utility + logit
+        pipeline. 
+        D -> R is the same as from the Gorman rule. """
         new_states = [None] * self.n_agents
 
         for agent in self.agents:
@@ -138,25 +192,24 @@ class NetworkModel:
             draw = self.rng.random()
 
             if agent.state == S:
-                if d_frac >= agent.risk_aversion_start and draw < d_frac:
-                    new_states[agent.node_id] = D
-                else: 
-                    new_states[agent.node_id] = S
-            elif agent.state == D: 
+                # Loss-averse utility
+                delta_u = _loss_averse_utility(d_frac, agent.lam_start)
+                # Bounded rationality 
+                p_drink = _logit_probability(delta_u, self.tau)
+                new_states[agent.node_id] = D if draw < p_drink else S
+
+            elif agent.state == D:
+                # same as before: quitting depends only on social encouragement
                 probability = min(r_frac + self.gamma, 1.0)
-                if draw < probability:
-                    new_states[agent.node_id] = R
-                else: 
-                    new_states[agent.node_id] = D
+                new_states[agent.node_id] = R if draw < probability else D
+
             elif agent.state == R:
-                if d_frac >= agent.risk_aversion_relapse:
-                    probability = min(d_frac + self.rho, 1.0)
-                else:
-                    probability = self.rho
-                if draw < probability:
-                    new_states[agent.node_id] = D
-                else:
-                    new_states[agent.node_id] = R
+                # Loss-averse utility
+                delta_u = _loss_averse_utility(d_frac, agent.lam_relapse)
+                # Bounded rationality / logit choice
+                p_relapse_drive = _logit_probability(delta_u, self.tau)
+                probability = min(p_relapse_drive + self.rho, 1.0)
+                new_states[agent.node_id] = D if draw < probability else R
 
         for agent in self.agents:
             agent.state = new_states[agent.node_id]
