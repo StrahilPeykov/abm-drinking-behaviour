@@ -64,10 +64,11 @@ def _logit_probability(delta_u: float, tau: float) -> float:
     tau = max(tau, 1e-9) #avoid division by zero
     z = np.clip(-delta_u / tau, -60.0, 60.0)
     return 1.0 / (1.0 + np.exp(z))
+    
 
 
-def _loss_averse_utility(d_frac: float, lam: float) -> float:
-    """Utility difference U(drink) - U(abstain) under a loss-averse value
+"""def _loss_averse_utility(d_frac: float, lam: float) -> float:
+    Utility difference U(drink) - U(abstain) under a loss-averse value
     function (Kahneman & Tversky, 1979).
  
     d_frac -> gain term: reward for matching a drinking-heavy neighbourhood (social reinforcement)
@@ -76,10 +77,29 @@ def _loss_averse_utility(d_frac: float, lam: float) -> float:
                                    
     Simplified from the traditional prospect theory function: 
     the full prospect-theory value is V = Σ w(p_i) · v(x_i) - value function v(x) and probability weighting function w(p). 
-    As it would expand our scope even more. """
+    As it would expand our scope even more.
 
     delta_u = d_frac - lam * (1.0 - d_frac)
-    return delta_u
+    return delta_u"""
+
+#loss and risk aversion
+
+def _risk_averse_value(x: float, rho: float) -> float:
+    """Concave value function capturing risk aversion.
+    rho = 0   -> risk-neutral (linear, recovers the current behaviour)
+    rho > 0   -> risk-averse (concave, diminishing marginal value)
+    rho < 0   -> risk-seeking (convex)
+    """
+    eps = 1e-6 #epsilon to avoid division by 0
+    x_safe = max(x, eps)
+    if abs(rho) < 1e-9:
+        return x_safe
+    return (x_safe ** (1 - rho)) / (1 - rho)
+
+def _loss_averse_utility(d_frac: float, lam: float, rho: float = 0.0) -> float:
+    gain_term = _risk_averse_value(d_frac, rho)
+    loss_term = _risk_averse_value(1.0 - d_frac, rho)
+    return gain_term - lam * loss_term
 
 @dataclass
 class NetworkModel:
