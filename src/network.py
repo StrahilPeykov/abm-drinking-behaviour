@@ -5,22 +5,29 @@ convert between states based on the composition of their neighbourhood
 (``_transition``). There is no spatial movement; the network topology encodes
 social structure.
 
-Transition rules mirror the lattice model, replacing site co-occupants with
-graph neighbours::
+Transition rules mirror the lattice model, replacing site co-occupants with graph neighbours. 
+Instead of the hard-threshold risk-aversion gate we use loss-averse-utility and bounded-rationality (logit) decision rule:
 
-    P(S -> D) = d_frac  if d_frac >= agent.risk_aversion_start, else 0 -> start drinking if social pressure higher than own psychological barrier
-    P(D -> R) = r_frac + gamma
-    P(R -> D) = d_frac + rho  if d_frac >= agent.risk_aversion_relapse, else rho
+    S -> D: delta_u = risk_averse_value(d_frac * age_susceptibility, kappa_start)
+                       - lam_start * risk_averse_value(1 - d_frac * age_susceptibility, kappa_start)
+            P(D) = logit(delta_u, tau)
+    D -> R: P(R) = r_frac + gamma                          (unchanged from Gorman)
+    R -> D: delta_u = risk_averse_value(d_frac, kappa_relapse)
+                       - lam_relapse * risk_averse_value(1 - d_frac, kappa_relapse)
+            P(D) = logit(delta_u, tau) + rho
 
 where d_frac and r_frac are the fractions of current drinkers and former
-drinkers among the agent's neighbours. Each agent's risk_aversion thresholds
-are drawn independently from Uniform(0, 1) at initialisation.
+drinkers among the agent's neighbours. lam (loss aversion) and kappa (risk
+aversion / utility curvature) are drawn independently per agent from Normal
+distributions at initialisation. age_susceptibility scales peer-influence
+strength for the S -> D transition only, decreasing with age (de la Haye
+et al., 2021). We only use it for initiation, not relapse, based on the paper.
 
-Isolated nodes (degree 0) face zero social influence; D agents still quit
-at rate gamma and R agents are shielded from relapse (threshold never met).
-Transitions are synchronous: all agents convert based on neighbourhood
-composition at the start of the iteration.
+Isolated nodes (degree 0) face zero social influence; D agents quit
+at rate gamma. Transitions are synchronous: all agents convert based on
+neighbourhood composition at the start of the iteration.
 """
+
 from dataclasses import dataclass, field
 
 import networkx as nx
@@ -36,21 +43,42 @@ class Agent:
     Attributes
     ----------
     node_id:               index of the corresponding node in the graph
-    risk_aversion_start:   personal threshold for d_frac required before a
-                           susceptible agent can start drinking; drawn from
-                           Uniform(0, 1)
-    risk_aversion_relapse: personal threshold for d_frac required before a
-                           former drinker can relapse; drawn from
-                           Uniform(0, 1)
+    age:            agent age; scales age_susceptibility for the S -> D
+                    transition (de la Haye et al., 2021)
+    lam_start:      loss-aversion coefficient (lambda) for the S -> D
+                    utility comparison; drawn from a Normal distribution
+    lam_relapse:    loss-aversion coefficient (lambda) for the R -> D
+                    utility comparison; drawn from a Normal distribution
+    kappa_start:    risk-aversion / utility-curvature coefficient (Pratt,
+                    1964) for the S -> D comparison; 0 = risk-neutral,
+                    > 0 = risk-averse, < 0 = risk-seeking
+    kappa_relapse:  risk-aversion / utility-curvature coefficient for the
+                    R -> D comparison
     state:                 current drinking state - S (susceptible),
                            D (current drinker), or R (former drinker)
     """
     node_id: int
-    #risk_aversion_start: float = 0.0
-    #risk_aversion_relapse: float = 0.0
+    age: float = 16.0
     lam_start: float = 2.0
     lam_relapse: float = 2.0
+    kappa_start: float = 0.0
+    kappa_relapse: float = 0.0
     state: int = S
+
+    @property
+    def age_susceptibility(self) -> float:
+        """Susceptibility to peer influence as a function of age.
+        Resistance to peer influence increases through adolescence (de la Haye et al., 2021) - 
+        so susceptibility is modelled as decreasing with age. Anchored at 1.0 around age 13
+        (early adolescence, peak susceptibility) and decaying toward a floor in adulthood. 
+        min_susceptibility prevents susceptibility from reaching exactly zero, since some 
+        peer effect persists into adulthood. We apply this mechanism only to taking up drinking (based on paper findings)"""
+
+        peak_age = 13.0
+        decay_rate = 0.08
+        min_susceptibility = 0.2
+        raw = np.exp(-decay_rate * max(self.age - peak_age, 0.0))
+        return min_susceptibility + (1.0 - min_susceptibility) * raw
 
 def _logit_probability(delta_u: float, tau: float) -> float:
     """Convert a utility difference into a choice probability via the
@@ -64,7 +92,6 @@ def _logit_probability(delta_u: float, tau: float) -> float:
     tau = max(tau, 1e-9) #avoid division by zero
     z = np.clip(-delta_u / tau, -60.0, 60.0)
     return 1.0 / (1.0 + np.exp(z))
-    
 
 
 """def _loss_averse_utility(d_frac: float, lam: float) -> float:
@@ -84,21 +111,21 @@ def _logit_probability(delta_u: float, tau: float) -> float:
 
 #loss and risk aversion
 
-def _risk_averse_value(x: float, rho: float) -> float:
-    """Concave value function capturing risk aversion.
-    rho = 0   -> risk-neutral (linear, recovers the current behaviour)
-    rho > 0   -> risk-averse (concave, diminishing marginal value)
-    rho < 0   -> risk-seeking (convex)
+def _risk_averse_value(x: float, kappa: float) -> float:
+    """Concave value function capturing risk aversion. using kappa instead
+    kappa = 0   -> risk-neutral (linear, recovers the current behaviour)
+    kappa > 0   -> risk-averse (concave, diminishing marginal value)
+    kappa < 0   -> risk-seeking (convex)
     """
     eps = 1e-6 #epsilon to avoid division by 0
     x_safe = max(x, eps)
-    if abs(rho) < 1e-9:
+    if abs(kappa) < 1e-9:
         return x_safe
-    return (x_safe ** (1 - rho)) / (1 - rho)
+    return (x_safe ** (1 - kappa)) / (1 - kappa)
 
-def _loss_averse_utility(d_frac: float, lam: float, rho: float = 0.0) -> float:
-    gain_term = _risk_averse_value(d_frac, rho)
-    loss_term = _risk_averse_value(1.0 - d_frac, rho)
+def _loss_averse_utility(d_frac: float, lam: float, kappa: float = 0.0) -> float:
+    gain_term = _risk_averse_value(d_frac, kappa)
+    loss_term = _risk_averse_value(1.0 - d_frac, kappa)
     return gain_term - lam * loss_term
 
 @dataclass
@@ -121,8 +148,11 @@ class NetworkModel:
                           drawn from a Normal and clipped at a small positive floor so lam never goes non-positive. 
                           lam_mean defaults to 2.0 (commonly-cited empirical ratio (losses feel ~2x as strong
                           as equivalent gains).
-    initial_drinker_frac: fraction of agents initialised as current drinkers,
-                          chosen randomly across the network
+    kappa_mean, kappa_sd: mean and standard deviation of the per-agent risk-aversion / utility-curvature
+                          coefficients (Pratt, 1964), drawn from a Normal distribution. kappa = 0 is
+                          risk-neutral and recovers the original linear utility; kappa > 0 is risk-averse
+                          ; kappa < 0 is risk-seeking. defaults to 0.0/0.0 = risk-neutral, until calibrated.
+    initial_drinker_frac: fraction of agents initialised as current drinkers, chosen randomly across the network
     seed:                 random seed for reproducibility
     """
 
@@ -134,6 +164,8 @@ class NetworkModel:
     tau: float = 0.5
     lam_mean: float = 2.0
     lam_sd: float = 0.5
+    kappa_mean: float = 0.0
+    kappa_sd: float = 0.0
     initial_drinker_frac: float = 0.1
     seed: int | None = None
 
@@ -178,10 +210,14 @@ class NetworkModel:
         lam_floor = 1e-3
         lam_start_draws = np.clip(lam_start_draws, lam_floor, None)
         lam_relapse_draws = np.clip(lam_relapse_draws, lam_floor, None)
+        kappa_start_draws = self.rng.normal(self.kappa_mean, self.kappa_sd, size=self.n_agents)
+        kappa_relapse_draws = self.rng.normal(self.kappa_mean, self.kappa_sd, size=self.n_agents)
 
         for i, agent in enumerate(self.agents):
             agent.lam_start = float(lam_start_draws[i])
             agent.lam_relapse = float(lam_relapse_draws[i])
+            agent.kappa_start = float(kappa_start_draws[i])
+            agent.kappa_relapse = float(kappa_relapse_draws[i])
 
     def _states(self) -> np.ndarray:
         return np.array([a.state for a in self.agents], dtype=np.int64)
@@ -212,8 +248,10 @@ class NetworkModel:
             draw = self.rng.random()
 
             if agent.state == S:
+                #effective_d_frac - d_frac scaled by agents individual susceptibility to the influence based no age
+                effective_d_frac = d_frac * agent.age_susceptibility
                 # Loss-averse utility
-                delta_u = _loss_averse_utility(d_frac, agent.lam_start)
+                delta_u = _loss_averse_utility(effective_d_frac, agent.lam_start, agent.kappa_start)
                 # Bounded rationality 
                 p_drink = _logit_probability(delta_u, self.tau)
                 new_states[agent.node_id] = D if draw < p_drink else S
@@ -225,7 +263,7 @@ class NetworkModel:
 
             elif agent.state == R:
                 # Loss-averse utility
-                delta_u = _loss_averse_utility(d_frac, agent.lam_relapse)
+                delta_u = _loss_averse_utility(d_frac, agent.lam_relapse, agent.kappa_relapse)
                 # Bounded rationality / logit choice
                 p_relapse_drive = _logit_probability(delta_u, self.tau)
                 probability = min(p_relapse_drive + self.rho, 1.0)
