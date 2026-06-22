@@ -15,6 +15,7 @@ Instead of the hard-threshold risk-aversion gate we use loss-averse-utility and 
     R -> D: delta_u = risk_averse_value(d_frac, kappa_relapse)
                        - lam_relapse * risk_averse_value(1 - d_frac, kappa_relapse)
             P(D) = logit(delta_u, tau) + rho
+    D -> R: P(R) = r_frac + gamma * exp(-habituation_rate * tenure)
 
 where d_frac and r_frac are the fractions of current drinkers and former
 drinkers among the agent's neighbours. lam (loss aversion) and kappa (risk
@@ -22,6 +23,14 @@ aversion / utility curvature) are drawn independently per agent from Normal
 distributions at initialisation. age_susceptibility scales peer-influence
 strength for the S -> D transition only, decreasing with age (de la Haye
 et al., 2021). We only use it for initiation, not relapse, based on the paper.
+
+The D -> R quit rule carries a habituation/adaptation mechanism: the
+spontaneous quit rate gamma decays with the number of consecutive steps the
+agent has been drinking (tenure), so sustained drinking becomes
+self-reinforcing and harder to leave. habituation_rate = 0 recovers Gorman's
+constant quit rate. This is the model's learning/adaptation component:
+agents update their behaviour from accumulated experience rather than acting
+on fixed traits alone.
 
 Isolated nodes (degree 0) face zero social influence; D agents quit
 at rate gamma. Transitions are synchronous: all agents convert based on
@@ -56,6 +65,9 @@ class Agent:
                     R -> D comparison
     state:                 current drinking state - S (susceptible),
                            D (current drinker), or R (former drinker)
+    tenure:         number of consecutive steps spent as a current drinker;
+                    drives the habituation decay of the quit rate, reset to 0
+                    whenever the agent is not a drinker
     """
     node_id: int
     age: float = 16.0
@@ -64,6 +76,7 @@ class Agent:
     kappa_start: float = 0.0 #risk-aversion
     kappa_relapse: float = 0.0 #risk-aversion
     state: int = S
+    tenure: int = 0  # consecutive steps as a drinker (habituation)
 
     @property
     def age_susceptibility(self) -> float:
@@ -152,6 +165,11 @@ class NetworkModel:
                           coefficients (Pratt, 1964), drawn from a Normal distribution. kappa = 0 is
                           risk-neutral and recovers the original linear utility; kappa > 0 is risk-averse
                           ; kappa < 0 is risk-seeking. defaults to 0.0/0.0 = risk-neutral, until calibrated.
+    habituation_rate:     decay rate h of the spontaneous quit rate with drinking
+                          tenure; the D -> R quit term is gamma * exp(-h * tenure).
+                          h = 0 recovers Gorman's constant quit rate; larger h makes
+                          long-term drinkers progressively less likely to quit
+                          (habituation / adaptation).
     initial_drinker_frac: fraction of agents initialised as current drinkers, chosen randomly across the network
     seed:                 random seed for reproducibility
     """
@@ -168,6 +186,7 @@ class NetworkModel:
     kappa_sd: float = 0.0
     age_mean: float = 20.0
     age_sd: float = 2.0
+    habituation_rate: float = 0.0
     initial_drinker_frac: float = 0.1
     seed: int | None = None
 
@@ -190,6 +209,8 @@ class NetworkModel:
             raise ValueError("rho must be in [0, 1]")
         if self.tau <= 0.0:
             raise ValueError("tau must be positive (use a small value, not 0, for near-deterministic behaviour)")
+        if self.habituation_rate < 0.0:
+            raise ValueError("habituation_rate must be non-negative")
         if not 0.0 <= self.initial_drinker_frac <= 1.0:
             raise ValueError("initial_drinker_frac must be in [0, 1]")
 
@@ -263,8 +284,13 @@ class NetworkModel:
                 new_states[agent.node_id] = D if draw < p_drink else S
 
             elif agent.state == D:
-                # same as before: quitting depends only on social encouragement
-                probability = min(r_frac + self.gamma, 1.0)
+                # quitting depends on social encouragement plus a spontaneous
+                # quit rate that decays with drinking tenure (habituation):
+                # the longer the agent has been drinking, the less likely it
+                # is to stop. habituation_rate = 0 recovers Gorman's constant.
+                effective_gamma = self.gamma * np.exp(
+                    -self.habituation_rate * agent.tenure)
+                probability = min(r_frac + effective_gamma, 1.0)
                 new_states[agent.node_id] = R if draw < probability else D
 
             elif agent.state == R:
@@ -277,6 +303,9 @@ class NetworkModel:
 
         for agent in self.agents:
             agent.state = new_states[agent.node_id]
+            # update drinking tenure for the habituation mechanism: count up
+            # while drinking, reset on any exit from the drinking state.
+            agent.tenure = agent.tenure + 1 if agent.state == D else 0
 
     def step(self):
         self._transition()
