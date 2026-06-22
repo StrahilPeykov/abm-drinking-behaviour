@@ -59,10 +59,10 @@ class Agent:
     """
     node_id: int
     age: float = 16.0
-    lam_start: float = 2.0
-    lam_relapse: float = 2.0
-    kappa_start: float = 0.0
-    kappa_relapse: float = 0.0
+    lam_start: float = 2.0 #loss-aversion
+    lam_relapse: float = 2.0 #loss-aversion
+    kappa_start: float = 0.0 #risk-aversion
+    kappa_relapse: float = 0.0 #risk-aversion
     state: int = S
 
     @property
@@ -166,6 +166,8 @@ class NetworkModel:
     lam_sd: float = 0.5
     kappa_mean: float = 0.0
     kappa_sd: float = 0.0
+    age_mean: float = 20.0
+    age_sd: float = 2.0
     initial_drinker_frac: float = 0.1
     seed: int | None = None
 
@@ -213,11 +215,15 @@ class NetworkModel:
         kappa_start_draws = self.rng.normal(self.kappa_mean, self.kappa_sd, size=self.n_agents)
         kappa_relapse_draws = self.rng.normal(self.kappa_mean, self.kappa_sd, size=self.n_agents)
 
+        age_draws = self.rng.normal(self.age_mean, self.age_sd, size=self.n_agents)
+        age_draws = np.clip(age_draws, 16.0, 24.0) #clipping the age to be within our methodological bounds - 95% were not clipped anyways as it's drawn from standard normal
+
         for i, agent in enumerate(self.agents):
             agent.lam_start = float(lam_start_draws[i])
             agent.lam_relapse = float(lam_relapse_draws[i])
             agent.kappa_start = float(kappa_start_draws[i])
             agent.kappa_relapse = float(kappa_relapse_draws[i])
+            agent.age = float(age_draws[i])
 
     def _states(self) -> np.ndarray:
         return np.array([a.state for a in self.agents], dtype=np.int64)
