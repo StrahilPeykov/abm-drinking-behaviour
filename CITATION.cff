@@ -1,0 +1,47 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "Agent-Based Modelling of Drinking Behaviour: Replicating and Extending Gorman et al. (2006)"
+abstract: >-
+  A replication of the Gorman et al. (2006) lattice agent-based model of
+  drinking behaviour, extended to a social-network model in which agents
+  decide whether to drink by playing a neighbourhood coordination game under
+  bounded rationality, risk aversion, loss aversion, age-dependent
+  susceptibility, and habituation.
+type: software
+authors:
+  - family-names: Peykov
+    given-names: Strahil
+  - family-names: Dorobis
+    given-names: Alicja
+  - family-names: Rotko
+    given-names: Julia
+  - family-names: Skarboń
+    given-names: Philippe
+date-released: 2026-06-30
+license: MIT
+repository-code: "https://github.com/StrahilPeykov/abm-drinking-behaviour"
+keywords:
+  - agent-based modelling
+  - drinking behaviour
+  - social networks
+  - game theory
+  - sensitivity analysis
+references:
+  - type: article
+    authors:
+      - family-names: Gorman
+        given-names: Dennis M.
+      - family-names: Mezic
+        given-names: Jadranka
+      - family-names: Mezic
+        given-names: Igor
+      - family-names: Gruenewald
+        given-names: Paul J.
+    title: "Agent-Based Modeling of Drinking Behavior: A Preliminary Model and Potential Applications to Theory and Practice"
+    journal: "American Journal of Public Health"
+    year: 2006
+    volume: 96
+    issue: 11
+    start: 2055
+    end: 2060
+    doi: "10.2105/AJPH.2005.063289"
