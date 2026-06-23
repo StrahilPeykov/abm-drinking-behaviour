@@ -107,21 +107,6 @@ def _logit_probability(delta_u: float, tau: float) -> float:
     return 1.0 / (1.0 + np.exp(z))
 
 
-"""def _loss_averse_utility(d_frac: float, lam: float) -> float:
-    Utility difference U(drink) - U(abstain) under a loss-averse value
-    function (Kahneman & Tversky, 1979).
- 
-    d_frac -> gain term: reward for matching a drinking-heavy neighbourhood (social reinforcement)
-    (1 - d_frac) -> loss term: downside of drinking when the neighbourhood does NOT support it,
-                                   weighted lambda times more heavily than the equivalent gain
-                                   
-    Simplified from the traditional prospect theory function: 
-    the full prospect-theory value is V = Σ w(p_i) · v(x_i) - value function v(x) and probability weighting function w(p). 
-    As it would expand our scope even more.
-
-    delta_u = d_frac - lam * (1.0 - d_frac)
-    return delta_u"""
-
 #loss and risk aversion
 
 def _risk_averse_value(x: float, kappa: float) -> float:
@@ -237,7 +222,10 @@ class NetworkModel:
         kappa_relapse_draws = self.rng.normal(self.kappa_mean, self.kappa_sd, size=self.n_agents)
 
         age_draws = self.rng.normal(self.age_mean, self.age_sd, size=self.n_agents)
-        age_draws = np.clip(age_draws, 16.0, 24.0) #clipping the age to be within our methodological bounds - 95% were not clipped anyways as it's drawn from standard normal
+        # Clip ages to the 16-24 young-adult window we model; at the default
+        # Normal(20, 2) only ~5% of draws fall outside it, so the clip rarely
+        # distorts the distribution.
+        age_draws = np.clip(age_draws, 16.0, 24.0)
 
         for i, agent in enumerate(self.agents):
             agent.lam_start = float(lam_start_draws[i])

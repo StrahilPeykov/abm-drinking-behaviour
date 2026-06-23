@@ -1,3 +1,15 @@
+"""Run the social-network drinking model and plot S/D/R fractions over time.
+
+Exposes every model parameter on the command line, including the behavioural
+ones (bounded rationality, risk/loss aversion, age, habituation), so the full
+extension can be driven without editing code.
+
+Usage:
+    python experiments/run_network.py
+    python experiments/run_network.py --kappa-mean 0.5 --habituation-rate 0.2
+    python experiments/run_network.py --tau 0.1 --age-mean 17
+"""
+
 import argparse
 import sys
 from pathlib import Path
@@ -10,21 +22,40 @@ from src.network import NetworkModel
 
 RESULTS = Path(__file__).resolve().parents[1] /  "results"
 
+
 def main():
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter)
+    # Network / structural parameters
     parser.add_argument("--n-agents", type=int, default=100)
     parser.add_argument("--k", type=int, default=4)
     parser.add_argument("--p-rewire", type=float, default=0.1)
+    # Inherited Gorman transition rates
     parser.add_argument("--gamma", type=float, default=0.3)
-    parser.add_argument("--rho", type=float, default=0.05)
+    parser.add_argument("--rho", type=float, default=0.3)
+    # Behavioural parameters (the extension)
+    parser.add_argument("--tau", type=float, default=0.5,
+                        help="logit temperature (bounded rationality)")
+    parser.add_argument("--lam-mean", type=float, default=2.0,
+                        help="mean loss-aversion coefficient")
+    parser.add_argument("--kappa-mean", type=float, default=0.0,
+                        help="mean risk-aversion / utility curvature")
+    parser.add_argument("--age-mean", type=float, default=20.0,
+                        help="mean agent age (clipped to 16-24)")
+    parser.add_argument("--habituation-rate", type=float, default=0.0,
+                        help="decay of quit rate with drinking tenure")
     parser.add_argument("--initial-drinker-frac", type=float, default=0.1)
     parser.add_argument("--steps", type=int, default=500)
-    parser.add_argument("--seed", type=int, default=42,)
+    parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
 
     model = NetworkModel(
-        n_agents=args.n_agents, k=args.k, p_rewire=args.p_rewire, gamma=args.gamma,
-        rho=args.rho, initial_drinker_frac=args.initial_drinker_frac, seed=args.seed
+        n_agents=args.n_agents, k=args.k, p_rewire=args.p_rewire,
+        gamma=args.gamma, rho=args.rho, tau=args.tau, lam_mean=args.lam_mean,
+        kappa_mean=args.kappa_mean, age_mean=args.age_mean,
+        habituation_rate=args.habituation_rate,
+        initial_drinker_frac=args.initial_drinker_frac, seed=args.seed,
     )
     history = pd.DataFrame(model.run(args.steps))
 
