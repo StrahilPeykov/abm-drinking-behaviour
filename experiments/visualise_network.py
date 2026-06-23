@@ -40,7 +40,7 @@ def main():
     parser.add_argument("--k",         type=int,   default=4)
     parser.add_argument("--p-rewire",  type=float, default=0.1)
     parser.add_argument("--gamma",     type=float, default=0.3)
-    parser.add_argument("--rho",       type=float, default=0.05)
+    parser.add_argument("--rho",       type=float, default=0.3)
     parser.add_argument("--steps",     type=int,   default=200)
     parser.add_argument("--interval",  type=int,   default=120,
                         help="milliseconds between frames")
