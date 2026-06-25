@@ -70,7 +70,7 @@ def main():
 
     nx.draw_networkx_edges(
         model.graph, pos, ax=ax_net,
-        edge_color="#333355", alpha=0.5, width=0.6,
+        edge_color="#8892c8", alpha=0.55, width=0.9,
     )
     node_collection = nx.draw_networkx_nodes(
         model.graph, pos, ax=ax_net,

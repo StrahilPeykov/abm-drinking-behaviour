@@ -140,16 +140,8 @@ any, is marked in the file where it appears.
 
 ## References
 
-- Gorman, D. M., Mezic, J., Mezic, I., & Gruenewald, P. J. (2006). Agent-based
-  modeling of drinking behavior: a preliminary model and potential applications
-  to theory and practice. *American Journal of Public Health*, 96(11),
-  2055–2060.
-- Müller, B., et al. (2013). Describing human decisions in agent-based models –
-  ODD+D, an extension of the ODD protocol. *Environmental Modelling & Software*,
-  48, 37–48.
-- Watts, D. J., & Strogatz, S. H. (1998). Collective dynamics of 'small-world'
-  networks. *Nature*, 393, 440–442.
-- Kahneman, D., & Tversky, A. (1979). Prospect theory: an analysis of decision
-  under risk. *Econometrica*, 47(2), 263–291.
-- McKelvey, R. D., & Palfrey, T. R. (1995). Quantal response equilibria for
-  normal form games. *Games and Economic Behavior*, 10(1), 6–38.
+- Gorman, D. M., Mezic, J., Mezic, I., & Gruenewald, P. J. (2006). Agent-based modeling of drinking behavior: a preliminary model and potential applications to theory and practice. American journal of public health, 96(11), 2055–2060. https://doi.org/10.2105/AJPH.2005.063289
+- Müller, B., Bohn, F., Dreßler, G., Groeneveld, J., Klassert, C., Martin, R., Schlüter, M., Schulze, J., Weise, H., & Schwarz, N. (2013). Describing human decisions in agent-based models : ODD + D, an extension of the ODD protoc. Environmental modelling & software, 48, 37-48. https://doi.org/10.1016/j.envsoft.2013.06.003
+- Watts, D., Strogatz, S. Collective dynamics of ‘small-world’ networks. _Nature_, 393, 440-442 (1998). https://doi.org/10.1038/30918
+- Kahneman, D., & Tversky, A. (1979). Prospect Theory: An Analysis of Decision under Risk. _Econometrica_, 47(2), 263–291. https://doi.org/10.2307/1914185
+- McKelvey, Richard D., and Thomas R. Palfrey. “Quantal Response Equilibria for Normal Form Games.” Games and Economic Behavior, vol. 10, no. 1, July 1995, pp. 6–38. https://doi.org/10.1006/game.1995.1023
