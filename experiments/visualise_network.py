@@ -56,27 +56,27 @@ def main():
     pos = nx.spring_layout(model.graph, seed=args.seed)
 
     fig, (ax_net, ax_ts) = plt.subplots(1, 2, figsize=(13, 6))
-    fig.patch.set_facecolor("#1a1a2e")
+    fig.patch.set_facecolor("white")
     for ax in (ax_net, ax_ts):
-        ax.set_facecolor("#16213e")
-        ax.tick_params(colors="white")
+        ax.set_facecolor("white")
+        ax.tick_params(colors="#333333")
         for spine in ax.spines.values():
-            spine.set_edgecolor("#444466")
+            spine.set_edgecolor("#cccccc")
 
     # ── network panel ────────────────────────────────────────────────────────
-    ax_net.set_title("Network state", color="white", pad=10)
+    ax_net.set_title("Network state", color="#222222", pad=10)
     ax_net.set_axis_off()
 
     nx.draw_networkx_edges(
         model.graph, pos, ax=ax_net,
-        edge_color="#8892c8", alpha=0.55, width=0.9,
+        edge_color="#b9bccb", alpha=0.8, width=0.9,
     )
     node_collection = nx.draw_networkx_nodes(
         model.graph, pos, ax=ax_net,
         node_color=node_colours(model),
-        node_size=120, linewidths=0.4,
+        node_size=120, linewidths=0.6,
     )
-    node_collection.set_edgecolor("#cccccc")
+    node_collection.set_edgecolor("#444444")
 
     legend_handles = [
         plt.Line2D([0], [0], marker="o", color="none",
@@ -85,20 +85,20 @@ def main():
         for s in (S, D, R)
     ]
     ax_net.legend(handles=legend_handles, loc="lower left",
-                  framealpha=0.3, labelcolor="white",
-                  facecolor="#222244", edgecolor="#444466")
+                  framealpha=0.9, labelcolor="#222222",
+                  facecolor="white", edgecolor="#cccccc")
 
     step_text = ax_net.text(
         0.02, 0.97, "Step 0", transform=ax_net.transAxes,
-        color="white", fontsize=11, va="top",
+        color="#222222", fontsize=11, va="top",
     )
 
     # ── time-series panel ────────────────────────────────────────────────────
     ax_ts.set_xlim(0, args.steps)
     ax_ts.set_ylim(0, 1)
-    ax_ts.set_xlabel("Step", color="white")
-    ax_ts.set_ylabel("Fraction", color="white")
-    ax_ts.set_title("Population fractions", color="white", pad=10)
+    ax_ts.set_xlabel("Step", color="#333333")
+    ax_ts.set_ylabel("Fraction", color="#333333")
+    ax_ts.set_title("Population fractions", color="#222222", pad=10)
 
     xs: list[int]   = [0]
     ys_s: list[float] = [model.fractions()[S]]
@@ -111,8 +111,8 @@ def main():
                          label=STATE_LABELS[D])
     line_r, = ax_ts.plot(xs, ys_r, color=STATE_COLOURS[R], lw=1.5,
                          label=STATE_LABELS[R])
-    ax_ts.legend(framealpha=0.3, labelcolor="white",
-                 facecolor="#222244", edgecolor="#444466")
+    ax_ts.legend(framealpha=0.9, labelcolor="#222222",
+                 facecolor="white", edgecolor="#cccccc")
 
     fig.tight_layout(pad=2)
 
@@ -145,7 +145,7 @@ def main():
 
     if args.save:
         (RESULTS / "figures").mkdir(parents=True, exist_ok=True)
-        out = RESULTS / "figures" / "network_animation.gif"
+        out = RESULTS / "figures" / "network_animation_light.gif"
         ani.save(out, writer="pillow", fps=1000 // args.interval)
         print(f"Saved {out}")
     else:
