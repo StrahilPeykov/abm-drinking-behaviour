@@ -9,7 +9,6 @@ Instead of the hard-threshold risk-aversion gate we use loss-averse-utility and 
 
     S -> D: delta_u = risk_averse_value(d_frac * age_susceptibility, kappa_start) - lam_start * risk_averse_value(1 - d_frac * age_susceptibility, kappa_start)
             P(D) = logit(delta_u, tau)
-    D -> R: P(R) = r_frac + gamma  (unchanged from Gorman)
     R -> D: delta_u = risk_averse_value(d_frac, kappa_relapse) - lam_relapse * risk_averse_value(1 - d_frac, kappa_relapse)
             P(D) = logit(delta_u, tau) + rho
     D -> R: P(R) = r_frac + gamma * exp(-habituation_rate * tenure)
@@ -18,8 +17,15 @@ where d_frac and r_frac are the fractions of current drinkers and former
 drinkers among the agent's neighbours. lam (loss aversion) and kappa (risk
 aversion / utility curvature) are drawn independently per agent from Normal
 distributions at initialisation. age_susceptibility scales peer-influence
-strength for the S -> D transition only, decreasing with age. Only used for initiaion
-not used for relapse.
+strength for the S -> D transition only, decreasing with age. Only used for
+initiation, not for relapse.
+
+Note: because the S -> D rule is a logit of delta_u rather than the linear
+P = d_frac of the lattice model, it does not reduce exactly to Gorman's
+contagion even at kappa = 0, lam = 1: with no drinking neighbours (d_frac = 0)
+the logit retains a small positive spontaneous-initiation rate, a baseline the
+lattice model does not have. The habituation term, however, does recover
+Gorman's constant quit rate exactly at habituation_rate = 0.
 
 The D -> R quit rule carries a habituation/adaptation mechanism: the
 spontaneous quit rate gamma decays with the number of consecutive steps the
