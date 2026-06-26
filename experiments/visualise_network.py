@@ -1,5 +1,4 @@
 """Animated visualisation of the NetworkModel showing state changes over time.
-
 Each frame shows:
   - Left: network graph with nodes coloured by state
       blue  = susceptible (S)

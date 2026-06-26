@@ -9,8 +9,7 @@ One figure per result in results/figures/:
                                      non-monotonic effect of motion)
 3. replication_fig4_bar_space.png  - drinker distribution over sites after
                                      1000 iterations, bar vs no bar (p=0.3)
-4. replication_fig5_bar_susc.png   - susceptible fraction over time,
-                                     bar vs no bar (p=0.3)
+4. replication_fig5_bar_susc.png   - susceptible fraction over time, bar vs no bar (p=0.3)
 
 Figures 2, 4 and 5 show single stochastic runs, as in the paper; Figure 3 shows
 15 runs per panel with the median-depletion run highlighted, because single runs
