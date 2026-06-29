@@ -1,8 +1,7 @@
 """Run the social-network drinking model and plot S/D/R fractions over time.
 
 Exposes every model parameter on the command line, including the behavioural
-ones (bounded rationality, risk/loss aversion, age, habituation), so the full
-extension can be driven without editing code.
+ones (bounded rationality, risk/loss aversion, age, habituation), so the full extension can be driven without editing code.
 
 Usage:
     python experiments/run_network.py
@@ -60,6 +59,7 @@ def main():
     history = pd.DataFrame(model.run(args.steps))
 
     (RESULTS / "figures").mkdir(parents=True, exist_ok=True)
+
 
     fig, axes = plt.subplots(3, 1, figsize=(7, 8), sharex=True)
     series = [("susceptible", "% Susceptible"),

@@ -70,7 +70,9 @@ python experiments/run_baseline.py
 python experiments/run_baseline.py --p-move 0.3 --bar-site 7
 ```
 
-**Network extension**, every parameter is exposed on the CLI:
+**Network extension**, the main model parameters are exposed on the CLI
+(the per-agent distribution widths `lam_sd`, `kappa_sd`, `age_sd` keep their
+defaults; change them in `NetworkModel` if needed):
 
 ```bash
 python experiments/run_network.py

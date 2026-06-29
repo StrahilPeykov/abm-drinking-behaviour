@@ -2,18 +2,14 @@
 
 Agents are nodes on a Watts-Strogatz small-world graph. Each iteration they
 convert between states based on the composition of their neighbourhood
-(``_transition``). There is no spatial movement; the network topology encodes
-social structure.
+(``_transition``). There is no spatial movement; the network topology encodes social structure.
 
 Transition rules mirror the lattice model, replacing site co-occupants with graph neighbours. 
 Instead of the hard-threshold risk-aversion gate we use loss-averse-utility and bounded-rationality (logit) decision rule:
 
-    S -> D: delta_u = risk_averse_value(d_frac * age_susceptibility, kappa_start)
-                       - lam_start * risk_averse_value(1 - d_frac * age_susceptibility, kappa_start)
+    S -> D: delta_u = risk_averse_value(d_frac * age_susceptibility, kappa_start) - lam_start * risk_averse_value(1 - d_frac * age_susceptibility, kappa_start)
             P(D) = logit(delta_u, tau)
-    D -> R: P(R) = r_frac + gamma                          (unchanged from Gorman)
-    R -> D: delta_u = risk_averse_value(d_frac, kappa_relapse)
-                       - lam_relapse * risk_averse_value(1 - d_frac, kappa_relapse)
+    R -> D: delta_u = risk_averse_value(d_frac, kappa_relapse) - lam_relapse * risk_averse_value(1 - d_frac, kappa_relapse)
             P(D) = logit(delta_u, tau) + rho
     D -> R: P(R) = r_frac + gamma * exp(-habituation_rate * tenure)
 
@@ -21,8 +17,15 @@ where d_frac and r_frac are the fractions of current drinkers and former
 drinkers among the agent's neighbours. lam (loss aversion) and kappa (risk
 aversion / utility curvature) are drawn independently per agent from Normal
 distributions at initialisation. age_susceptibility scales peer-influence
-strength for the S -> D transition only, decreasing with age (de la Haye
-et al., 2021). We only use it for initiation, not relapse, based on the paper.
+strength for the S -> D transition only, decreasing with age. Only used for
+initiation, not for relapse.
+
+Note: because the S -> D rule is a logit of delta_u rather than the linear
+P = d_frac of the lattice model, it does not reduce exactly to Gorman's
+contagion even at kappa = 0, lam = 1: with no drinking neighbours (d_frac = 0)
+the logit retains a small positive spontaneous-initiation rate, a baseline the
+lattice model does not have. The habituation term, however, does recover
+Gorman's constant quit rate exactly at habituation_rate = 0.
 
 The D -> R quit rule carries a habituation/adaptation mechanism: the
 spontaneous quit rate gamma decays with the number of consecutive steps the
@@ -38,12 +41,10 @@ neighbourhood composition at the start of the iteration.
 """
 
 from dataclasses import dataclass, field
-
 import networkx as nx
 import numpy as np
 
 S, D, R = 0, 1, 2
-
 
 @dataclass
 class Agent:
@@ -51,9 +52,8 @@ class Agent:
 
     Attributes
     ----------
-    node_id:               index of the corresponding node in the graph
-    age:            agent age; scales age_susceptibility for the S -> D
-                    transition (de la Haye et al., 2021)
+    node_id:        index of the corresponding node in the graph
+    age:            agent age; scales age_susceptibility for the S -> D transition
     lam_start:      loss-aversion coefficient (lambda) for the S -> D
                     utility comparison; drawn from a Normal distribution
     lam_relapse:    loss-aversion coefficient (lambda) for the R -> D
@@ -63,8 +63,7 @@ class Agent:
                     > 0 = risk-averse, < 0 = risk-seeking
     kappa_relapse:  risk-aversion / utility-curvature coefficient for the
                     R -> D comparison
-    state:                 current drinking state - S (susceptible),
-                           D (current drinker), or R (former drinker)
+    state:          current drinking state - S (susceptible), D (current drinker), or R (former drinker)
     tenure:         number of consecutive steps spent as a current drinker;
                     drives the habituation decay of the quit rate, reset to 0
                     whenever the agent is not a drinker
@@ -81,11 +80,8 @@ class Agent:
     @property
     def age_susceptibility(self) -> float:
         """Susceptibility to peer influence as a function of age.
-        Resistance to peer influence increases through adolescence (de la Haye et al., 2021) - 
-        so susceptibility is modelled as decreasing with age. Anchored at 1.0 around age 13
-        (early adolescence, peak susceptibility) and decaying toward a floor in adulthood. 
-        min_susceptibility prevents susceptibility from reaching exactly zero, since some 
-        peer effect persists into adulthood. We apply this mechanism only to taking up drinking (based on paper findings)"""
+        Ivaniushina, & Titkova, 2021 showed that adolescent adjsut their drinking habbits to match the habits
+        of their peers."""
 
         peak_age = 13.0
         decay_rate = 0.08
@@ -94,12 +90,10 @@ class Agent:
         return min_susceptibility + (1.0 - min_susceptibility) * raw
 
 def _logit_probability(delta_u: float, tau: float) -> float:
-    """Convert a utility difference into a choice probability via the
-    logit / quantal-response rule (McKelvey & Palfrey, 1995).
+    """Convert a utility difference into a choice probability via the quantal-response rule /logit rule.
  
     P(drink) = 1 / (1 + exp(-delta_u / tau))
- 
-    tau controls bounded rationality:
+    tau used to control bounded rationality:
       - tau -> 0: approaches a deterministic best response (drink if delta_u > 0)
       - tau -> infinity: approaches a coin flip (0.5), no matter how favourable delta_u is"""
     tau = max(tau, 1e-9) #avoid division by zero
@@ -146,15 +140,14 @@ class NetworkModel:
                           drawn from a Normal and clipped at a small positive floor so lam never goes non-positive. 
                           lam_mean defaults to 2.0 (commonly-cited empirical ratio (losses feel ~2x as strong
                           as equivalent gains).
-    kappa_mean, kappa_sd: mean and standard deviation of the per-agent risk-aversion / utility-curvature
-                          coefficients (Pratt, 1964), drawn from a Normal distribution. kappa = 0 is
+    kappa_mean, kappa_sd: mean and standard deviation of the per-agent risk-aversion / utility-curvature coefficients, 
+                          drawn from a Normal distribution. kappa = 0 is
                           risk-neutral and recovers the original linear utility; kappa > 0 is risk-averse
                           ; kappa < 0 is risk-seeking. defaults to 0.0/0.0 = risk-neutral, until calibrated.
     habituation_rate:     decay rate h of the spontaneous quit rate with drinking
                           tenure; the D -> R quit term is gamma * exp(-h * tenure).
                           h = 0 recovers Gorman's constant quit rate; larger h makes
-                          long-term drinkers progressively less likely to quit
-                          (habituation / adaptation).
+                          long-term drinkers progressively less likely to quit (habituation / adaptation).
     initial_drinker_frac: fraction of agents initialised as current drinkers, chosen randomly across the network
     seed:                 random seed for reproducibility
     """
