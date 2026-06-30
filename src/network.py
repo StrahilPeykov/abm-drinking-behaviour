@@ -182,7 +182,7 @@ class NetworkModel:
         if not 0.0 <= self.gamma <= 1.0:
             raise ValueError("gamma must be in [0, 1]")
         
-        #new from Game Theory:
+        #extension from Game Theory:
         if not 0.0 <= self.rho <= 1.0:
             raise ValueError("rho must be in [0, 1]")
         if self.tau <= 0.0:
@@ -203,9 +203,7 @@ class NetworkModel:
         for i in self.rng.choice(self.n_agents, size=n_initial_drinkers, replace=False):
             self.agents[i].state = D
 
-        # draw per-agent loss-aversion coefficients from a Normal but cclipped at a small positive floor,
-        # instead of the old Uniform(0, 1) thresholds 
-        # this preserves population heterogeneity in risk attitude and givs lambda interpetaiton as in prospect theory
+        # draw per-agent loss-aversion coefficients from a Normal but cclipped at a small positive floor 
         lam_start_draws = self.rng.normal(self.lam_mean, self.lam_sd, size=self.n_agents)
         lam_relapse_draws = self.rng.normal(self.lam_mean, self.lam_sd, size=self.n_agents)
         lam_floor = 1e-3
@@ -215,9 +213,8 @@ class NetworkModel:
         kappa_relapse_draws = self.rng.normal(self.kappa_mean, self.kappa_sd, size=self.n_agents)
 
         age_draws = self.rng.normal(self.age_mean, self.age_sd, size=self.n_agents)
-        # Clip ages to the 16-24 young-adult window we model; at the default
-        # Normal(20, 2) only ~5% of draws fall outside it, so the clip rarely
-        # distorts the distribution.
+        # Clip ages to the 16-24 young-adult window we wanted to model; 
+        # at the default N(20, 2) only ~5% (CI is 95%) of draws fall outside it, so there is little distortion of the real distirbution
         age_draws = np.clip(age_draws, 16.0, 24.0)
 
         for i, agent in enumerate(self.agents):
@@ -236,8 +233,7 @@ class NetworkModel:
 
     def _transition(self):
         """Convert agents synchronously based on neighbourhood composition.
-        S -> D and R -> D now go through the loss-averse-utility + logit
-        pipeline. 
+        S -> D and R -> D now go through the loss-averse-utility + logit. 
         D -> R is the same as from the Gorman rule. """
         new_states = [None] * self.n_agents
 
@@ -258,9 +254,9 @@ class NetworkModel:
             if agent.state == S:
                 #effective_d_frac - d_frac scaled by agents individual susceptibility to the influence based no age
                 effective_d_frac = d_frac * agent.age_susceptibility
-                # Loss-averse utility
+                # loss-averse utility
                 delta_u = _loss_averse_utility(effective_d_frac, agent.lam_start, agent.kappa_start)
-                # Bounded rationality 
+                # bounded rationality 
                 p_drink = _logit_probability(delta_u, self.tau)
                 new_states[agent.node_id] = D if draw < p_drink else S
 
